@@ -1,0 +1,20 @@
+// HoopRate scoring regression tests. Run: node tests/scoring.test.js
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
+const js=html.split('<script>')[1].split('</script>')[0];
+const extract=(a,b)=>{const start=js.indexOf(a),end=js.indexOf(b,start+a.length);assert(start>=0&&end>start,'Function anchors available');return js.slice(start,end)};
+const clamp=(x,a=0,b=100)=>Math.max(a,Math.min(b,x));
+const metrics=Function('clamp',extract('function playMetrics(','function enhanceRating(')+'return playMetrics')(clamp);
+const score=Function('clamp',extract('function scoreWithAdjustments(','function personalized(')+'return scoreWithAdjustments')(clamp);
+const narrow=Array.from({length:25},(_,i)=>({period:i<12?3:4,scoreHome:30+2*i,scoreAway:31+2*i}));
+const runaway=Array.from({length:25},(_,i)=>({period:i<12?3:4,scoreHome:35+2*i,scoreAway:60+2*i}));
+assert(metrics(narrow).lateCloseRatio>metrics(runaway).lateCloseRatio);
+assert.equal(metrics(runaway).lateCloseRatio,0);
+const comeback=[{period:1,scoreHome:0,scoreAway:0},{period:1,scoreHome:5,scoreAway:25},...Array.from({length:11},(_,i)=>({period:4,scoreHome:8+4*i,scoreAway:26+i}))];
+assert(metrics(comeback).comeback>=20);
+assert(score(12,0,true,false)>0,'Moderate blowout penalty must not erase positive score');
+assert.equal(score(60,0,false,false),60);
+assert.equal(score(50,18,true,true),68);
+assert(js.includes("verifiedStarPresence"),'Star-availability reliability must be exposed');
+assert(js.includes("eingeschränkte Spielverlaufsdaten"),'Missing play-by-play must be marked');
+console.log('HoopRate scoring regression tests passed');
